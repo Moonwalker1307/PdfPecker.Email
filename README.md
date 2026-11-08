@@ -92,6 +92,9 @@ A message comes from a stranger, so the conversion treats it as hostile:
 - **Nothing is fetched and no files are read.** Images load only from the message's own parts and `data:` URIs.
   Remote images (and tracking pixels) are left out unless you set `PdfOptions.ResourceResolver`, which is then asked
   for http and https URLs only; `PdfOptions.BaseDirectory` and `AllowFileAccess` are ignored.
+- **Headers and file names cannot be disguised.** The characters that reorder text explicitly (Unicode bidi overrides,
+  embeddings and isolates) are removed from the subject, names, addresses and attachment names, so
+  `invoice‮fdp.exe` cannot read as `invoiceexe.pdf`. Right-to-left text shows correctly without them.
 - **Bounded time and memory.** Parsing is linear in the size of the message, with `EmailLimits` on the message size
   (100 MB), the number of parts (10,000) and the nesting depth (64); over a limit the conversion throws
   `PdfLimitException`. An `.msg` file's size limit applies to the file, its attachments count as parts and its attached
@@ -101,6 +104,17 @@ A message comes from a stranger, so the conversion treats it as hostile:
 - **Documented exceptions only.** Damaged mail never fails the conversion; it fails only with `PdfLimitException`,
   `ArgumentException` for invalid options (such as attachments with PDF/A-2), `OperationCanceledException`, or
   `PdfPeckerException` from PdfPecker.
+
+What the package leaves to you:
+
+- **Attachments stay what they are.** An embedded attachment can still be malware, and PDF viewers let a reader open
+  it. Scan `EmailMessage.Attachments` first, or set `EmbedAttachments = false` for mail you do not trust.
+- **The sender is not verified.** The header block shows the From address the message claims; SPF, DKIM and DMARC are
+  checked by the receiving mail server, not here.
+- **A `ResourceResolver` decides what is fetched.** If you load remote images, refuse private and loopback addresses
+  in it, or a message can make your server request internal URLs.
+- **Run conversions with a timeout.** Pass a cancellation token, set `PdfOptions.MaxPages`, and bound how many
+  conversions run at once.
 
 ## Limitations
 
