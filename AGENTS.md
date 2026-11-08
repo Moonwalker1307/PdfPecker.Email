@@ -56,7 +56,8 @@ the [PdfPecker](https://www.nuget.org/packages/PdfPecker) package, which lives i
 - `fuzz/PdfPecker.Email.Fuzz/` – the mutation fuzzer; `fuzz/README.md` describes it.
 - `bench/PdfPecker.Email.Benchmarks/` – times parsing and conversion of the fixtures and generated messages.
 - `.github/workflows/` – `build.yml` (build, tests on .NET 8, 9 and 10 and on Windows, pack, publish on a release),
-  `fuzz.yml` (nightly).
+  `fuzz.yml` (nightly), `vulnerability-scan.yml` (daily OSV-Scanner run on the NuGet packages, results in Security →
+  Code scanning).
 
 ## Build and verify
 
