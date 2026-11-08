@@ -18,7 +18,7 @@ namespace PdfPecker.Email.Fuzz;
 /// </summary>
 internal static class Program
 {
-    private static readonly string[] Targets = ["eml", "parse", "html", "sanitize", "msg", "rtf"];
+    private static readonly string[] Targets = ["eml", "parse", "html", "sanitize", "msg", "rtf", "tnef"];
 
     private static int Main(string[] args)
     {
@@ -144,7 +144,7 @@ internal static class Program
                 if (again.ToString() != output.ToString()) throw new InvalidOperationException("Sanitised HTML changed when sanitised again.");
                 break;
             }
-            case "msg":
+            case "msg" or "tnef":
             {
                 // An Outlook file that still parses goes through the whole conversion.
                 var m = EmailMessage.Parse(input, null, cancellationToken);
@@ -223,7 +223,7 @@ internal sealed class Worker(Options o)
         var nextReport = TimeSpan.FromSeconds(20);
         while (clock.Elapsed < o.Duration)
         {
-            var input = Mutator.Mutate(seeds, _random, binary: o.Target is "msg" or "rtf");
+            var input = Mutator.Mutate(seeds, _random, binary: o.Target is "msg" or "rtf" or "tnef");
             File.WriteAllBytes(current, input);
             var verdict = Execute(input);
             executions++;
@@ -325,6 +325,14 @@ internal static class Seeds
         if (target == "msg")
         {
             foreach (var name in MsgFixtures.Names) list.Add(MsgFixtures.Get(name));
+            return list;
+        }
+        if (target == "tnef")
+        {
+            // A winmail.dat on its own, and inside a message; most mutations keep the base64 of the second readable.
+            list.Add(MsgFixtures.OutlookTnef());
+            list.Add(MsgFixtures.PlainTnef());
+            list.Add(MsgFixtures.Get("tnef-outlook"));
             return list;
         }
         if (target == "rtf")

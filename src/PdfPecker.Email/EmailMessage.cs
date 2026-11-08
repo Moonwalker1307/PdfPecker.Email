@@ -74,9 +74,19 @@ public sealed partial class EmailMessage
             // checked on the file, and the parts and nesting limits still apply to the MIME.
             var (mime, length) = Msg.OutlookMessage.ToMime(message, limits, cancellationToken);
             var relaxed = new EmailLimits { MaxMessageBytes = int.MaxValue, MaxParts = limits.MaxParts * 3 + 3, MaxNestingDepth = limits.MaxNestingDepth * 3 + 3 };
-            return new EmailMessage(mime, MimeParser.Parse(mime, length, relaxed, cancellationToken)) { IsOutlookMessage = true, Original = message };
+            return new EmailMessage(mime, ExpandTnef(MimeParser.Parse(mime, length, relaxed, cancellationToken), limits, cancellationToken)) { OriginalExtension = ".msg", OriginalMediaType = "application/vnd.ms-outlook", Original = message };
         }
-        return new EmailMessage(message, MimeParser.Parse(message, limits, cancellationToken));
+        if (Msg.TnefObject.IsTnef(message))
+        {
+            // A winmail.dat on its own: the message it holds, written as MIME like an Outlook .msg file.
+            if (message.Length > limits.MaxMessageBytes)
+                throw new PdfLimitException($"The message is {message.Length} bytes, over the limit of {limits.MaxMessageBytes} (EmailLimits.MaxMessageBytes).");
+            var tnef = Msg.TnefObject.Read(message, cancellationToken)!;
+            var (mime, length) = Msg.OutlookMessage.ToMime(tnef, message.Length, limits, cancellationToken, headers: true, body: true);
+            var relaxed = new EmailLimits { MaxMessageBytes = int.MaxValue, MaxParts = limits.MaxParts * 3 + 3, MaxNestingDepth = limits.MaxNestingDepth * 3 + 3 };
+            return new EmailMessage(mime, MimeParser.Parse(mime, length, relaxed, cancellationToken)) { OriginalExtension = ".dat", OriginalMediaType = "application/ms-tnef", Original = message };
+        }
+        return new EmailMessage(message, ExpandTnef(MimeParser.Parse(message, limits, cancellationToken), limits, cancellationToken));
     }
 
     /// <summary>Reads a message from a stream, up to <see cref="EmailLimits.MaxMessageBytes"/>.</summary>
@@ -128,8 +138,11 @@ public sealed partial class EmailMessage
     /// </summary>
     internal byte[] Source { get; }
 
-    /// <summary>Whether the message was read from an Outlook .msg file.</summary>
-    internal bool IsOutlookMessage { get; private init; }
+    /// <summary>The extension of the file the message was read from: ".eml", or ".msg" or ".dat" (winmail.dat).</summary>
+    internal string OriginalExtension { get; private init; } = ".eml";
+
+    /// <summary>The media type of the file the message was read from.</summary>
+    internal string OriginalMediaType { get; private init; } = "message/rfc822";
 
     /// <summary>The bytes the message was read from: the .msg file for an Outlook message, else the MIME source.</summary>
     internal byte[] Original { get => _original ?? Source; private init => _original = value; }

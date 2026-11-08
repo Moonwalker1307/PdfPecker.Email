@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/PdfPecker.Email/PdfPecker.Email.csproj" />
-    <Compile Include="../../tests/PdfPecker.Email.Tests/Msg/MsgBuilder.cs;../../tests/PdfPecker.Email.Tests/Msg/MsgFixtures.cs;../../tests/PdfPecker.Email.Tests/Fixture.cs" Link="shared/%(Filename)%(Extension)" />
+    <Compile Include="../../tests/PdfPecker.Email.Tests/Msg/MsgBuilder.cs;../../tests/PdfPecker.Email.Tests/Msg/MsgFixtures.cs;../../tests/PdfPecker.Email.Tests/Msg/TnefBuilder.cs;../../tests/PdfPecker.Email.Tests/Fixture.cs" Link="shared/%(Filename)%(Extension)" />
     <None Include="../../tests/PdfPecker.Email.Tests/Fixtures/*.eml" Link="fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

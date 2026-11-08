@@ -182,11 +182,11 @@ public static class EmailToPdf
         {
             var name = FileNames.Clean(options.OriginalMessageFileName);
             if (name.Length == 0) name = "message.eml";
-            // An Outlook message is kept as the .msg file it was read from, not the MIME written for it.
-            if (message.IsOutlookMessage && name.EndsWith(".eml", StringComparison.OrdinalIgnoreCase)) name = name[..^4] + ".msg";
+            // An Outlook message is kept as the .msg file or winmail.dat it was read from, not the MIME written for it.
+            if (message.OriginalExtension != ".eml" && name.EndsWith(".eml", StringComparison.OrdinalIgnoreCase)) name = name[..^4] + message.OriginalExtension;
             attachments.Add(new PdfAttachment(Unique(name, names), message.Original)
             {
-                MimeType = message.IsOutlookMessage ? "application/vnd.ms-outlook" : "message/rfc822",
+                MimeType = message.OriginalMediaType,
                 Relationship = PdfAttachmentRelationship.Source,
             });
         }
