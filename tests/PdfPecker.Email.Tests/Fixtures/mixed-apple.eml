@@ -1,0 +1,26 @@
+From: Ann Example <ann@example.com>
+To: bob@example.com
+Subject: Photos
+Date: Thu, 5 Nov 2026 09:15:00 +0100
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="Apple-Mail=_1"
+
+--Apple-Mail=_1
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Here is the first photo:
+
+--Apple-Mail=_1
+Content-Type: image/png; name=photo1.png
+Content-Disposition: inline; filename=photo1.png
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAIAAABwJOjsAAAAJElEQVR4nGM4ISc3IIhh1OJRi0ct
+HrV41OJRi0ctHrV45FgMAFLhLK5mrmiuAAAAAElFTkSuQmCC
+--Apple-Mail=_1
+Content-Type: text/plain; charset=us-ascii
+
+And that's all.
+
+--Apple-Mail=_1--
