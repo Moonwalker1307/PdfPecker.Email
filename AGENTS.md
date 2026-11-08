@@ -3,12 +3,12 @@
 Guidance for coding agents (and people) working in this repository. `CLAUDE.md` imports this file, so Claude Code and
 other agents read the same rules.
 
-PdfPecker.Email is the `PdfPecker.Email` NuGet package: e-mail (.eml, MIME, and Outlook .msg) to PDF and PDF/A-3 with
-the attachments embedded. It has its own MIME parser, Outlook reader, header decoders, HTML sanitiser and CSS filter,
+PdfPecker.Email is the `PdfPecker.Email` NuGet package: e-mail (.eml, MIME, Outlook .msg and winmail.dat) to PDF and
+PDF/A-3 with the attachments embedded. It has its own MIME parser, Outlook reader, header decoders, HTML sanitiser and CSS filter,
 and hands the HTML it writes to
 the [PdfPecker](https://www.nuget.org/packages/PdfPecker) package, which lives in
-[Moonwalker1307/PdfPecker](https://github.com/Moonwalker1307/PdfPecker). `winmail.dat` (TNEF) is planned next, in
-this package.
+[Moonwalker1307/PdfPecker](https://github.com/Moonwalker1307/PdfPecker). Outlook-only items
+(appointments, contacts) as more than a message are not planned.
 
 ## Core rules
 
@@ -46,11 +46,12 @@ this package.
   quoted-printable), `Charsets` (charset names and the UTF-8 or Windows-1252 guess).
 - `src/PdfPecker.Email/Html/` – `EmailHtmlWriter` (the document PdfPecker converts: header block and body),
   `HtmlSanitizer`, `CssFilter`, `PlainText` (format=flowed and links), `Markup` (escaping).
-- `src/PdfPecker.Email/Msg/` – Outlook .msg: `CompoundFile` (the MS-CFB container), `OutlookMessage` (MAPI
-  properties to the MIME message they stand for, which `EmailMessage.Parse` then reads like any .eml),
+- `src/PdfPecker.Email/Msg/` – Outlook .msg and winmail.dat: `MapiObject` (MAPI properties, wherever they are
+  stored), `CompoundFile` (the MS-CFB container of .msg files), `TnefObject` (winmail.dat, MS-OXTNEF), `OutlookMessage`
+  (MAPI properties to the MIME message they stand for, which `EmailMessage.Parse` then reads like any .eml),
   `CompressedRtf` (MS-OXRTFCP) and `RtfText` (HTML encapsulated in RTF, or the plain text of other RTF).
 - `tests/PdfPecker.Email.Tests/` – xUnit. `Fixtures/*.eml` are the sample messages (kept with CRLF line ends by
-  `.gitattributes`), `Golden/*.html` the HTML each becomes. `Msg/MsgBuilder.cs` writes .msg files, and `Msg/MsgFixtures.cs` the Outlook
+  `.gitattributes`), `Golden/*.html` the HTML each becomes. `Msg/MsgBuilder.cs` writes .msg files, `Msg/TnefBuilder.cs` winmail.dat streams, and `Msg/MsgFixtures.cs` the Outlook
   fixtures with it (real .msg files carry real people's addresses, so none are checked in); the fuzzer links both.
 - `fuzz/PdfPecker.Email.Fuzz/` – the mutation fuzzer; `fuzz/README.md` describes it.
 - `bench/PdfPecker.Email.Benchmarks/` – times parsing and conversion of the fixtures and generated messages.
@@ -106,6 +107,8 @@ baselines changed and why. A refactor leaves every baseline unchanged.
 - `PdfAttachments.List` returns embedded files sorted by name (the PDF's name tree), not in the order they were added.
 - Outlook keeps most HTML mail only as compressed RTF with the HTML encapsulated (`\fromhtml1`); the HTML property
   (0x1013) is often missing, so `RtfText` is the usual path for HTML from Outlook, not a fallback.
+- A winmail.dat comes next to a plain text copy of the body. `EmailMessage.Tnef.cs` replaces that body only when the
+  TNEF one has HTML (or the message has none), and always puts the TNEF attachments in the winmail.dat's place.
 - Word's HTML, which Outlook sends, puts the body in `div.WordSection1 { page: WordSection1 }`; PdfPecker starts a new
   page for a named page, which is why `CssFilter` drops `page`.
 - PdfPecker deflates every embedded file, so a large incompressible attachment (a zip, a JPEG) costs most of the

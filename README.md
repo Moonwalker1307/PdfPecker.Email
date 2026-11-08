@@ -2,7 +2,7 @@
 
 # PdfPecker.Email
 
-E-mail to PDF for .NET: convert `.eml` messages (MIME) and Outlook `.msg` files to PDF and PDF/A-3, with the header
+E-mail to PDF for .NET: convert `.eml` messages (MIME), Outlook `.msg` files and `winmail.dat` to PDF and PDF/A-3, with the header
 block, the body as a mail client shows it, its inline images, and the attachments embedded in the PDF. It uses
 [PdfPecker](https://www.nuget.org/packages/PdfPecker) for the PDF and has no other dependency: its own MIME parser,
 Outlook reader, header decoders, HTML sanitiser and CSS filter, on the .NET base class library.
@@ -48,6 +48,10 @@ PdfPecker.
   text body, inline images, attachments and attached Outlook messages, which become `.eml` attachments. 8-bit
   strings of older Outlook versions are read in the message's code page, and Exchange addresses without an SMTP
   address are left out.
+- **winmail.dat (TNEF).** When Outlook or Exchange sends in its own format, the real body and the attachments are in
+  a `winmail.dat` attachment, next to a plain text copy. That part is opened: its attachments and attached messages
+  take its place, and its HTML body (also from compressed RTF) replaces a body without HTML. A `winmail.dat` on its
+  own converts too.
 - **The body a mail client shows.** The HTML alternative (or the plain text one, with `PreferPlainText`), the root
   of a multipart/related, inline images by `cid:` and `Content-Location`, images placed between text parts (Apple
   Mail), and plain text with format=flowed paragraphs joined and links made clickable.
@@ -56,7 +60,7 @@ PdfPecker.
 - **Attachments in the PDF.** Every attachment, attached message (as an `.eml` file), calendar invitation and
   unreferenced inline image is embedded with its MIME type and dates and listed in the viewer's attachments panel.
   With PDF/A-3 they become associated files (relationship Supplement), and `EmbedOriginalMessage` adds the message
-  itself (relationship Source), as the `.msg` file when it was one.
+  itself (relationship Source), as the `.msg` file or `winmail.dat` when it was one.
 - **PDF metadata.** The title, author and language default to the subject, the sender and Content-Language; all of
   PdfPecker's options work: page size, margins, fonts, PDF/A, PDF/UA, encryption and signing.
 - **`EmailMessage`** reads a message without converting it: subject, addresses, date, message ID, the plain text and
@@ -118,10 +122,10 @@ What the package leaves to you:
 
 ## Limitations
 
-- `winmail.dat` (TNEF) is not read yet; it is planned. A `winmail.dat` is embedded as an attachment.
 - Outlook items that are not mail (appointments, contacts, tasks) are shown as the message part they carry, usually
-  the subject and body only. Attachments that are embedded OLE objects or links to files have no content to keep and
-  are listed empty. Rich text bodies (not HTML) become plain text without their formatting.
+  the subject and body only. Attachments that are embedded OLE objects or links to files (in `.msg` files and
+  `winmail.dat`) have no content to keep and are listed empty. A damaged `winmail.dat` that is not TNEF stays an
+  attachment. Rich text bodies (not HTML) become plain text without their formatting.
 - Attached messages are embedded as `.eml` files, not drawn in the PDF.
 - S/MIME and PGP: signed messages show their content and keep the signature as an attachment; encrypted ones show
   only the encrypted part as an attachment. Signatures are not verified.

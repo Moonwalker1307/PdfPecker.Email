@@ -38,8 +38,8 @@ public sealed class GoldenTests
         Assert.True(PdfToImage.GetPageCount(pdf) >= 1);
     }
 
-    // The Outlook fixtures are written by the tests, so no real person's .msg file is checked in.
-    private static byte[] Bytes(string name) => name.StartsWith("msg-", StringComparison.Ordinal) ? Msg.MsgFixtures.Get(name) : Fixture.Bytes(name + ".eml");
+    // The Outlook and winmail.dat fixtures are written by the tests, so no real person's .msg file is checked in.
+    private static byte[] Bytes(string name) => name.StartsWith("msg-", StringComparison.Ordinal) || name.StartsWith("tnef-", StringComparison.Ordinal) ? Msg.MsgFixtures.Get(name) : Fixture.Bytes(name + ".eml");
 
     private static string SourceDirectory([System.Runtime.CompilerServices.CallerFilePath] string path = "") => Path.GetDirectoryName(path)!;
 }

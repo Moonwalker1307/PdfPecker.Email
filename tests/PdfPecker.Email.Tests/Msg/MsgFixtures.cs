@@ -10,7 +10,7 @@ internal static class MsgFixtures
 {
     internal static readonly DateTimeOffset Sent = new(2026, 3, 14, 9, 26, 53, TimeSpan.Zero);
 
-    internal static IReadOnlyList<string> Names { get; } = ["msg-html", "msg-rtf-html", "msg-rtf-plain", "msg-attached-message", "msg-ansi"];
+    internal static IReadOnlyList<string> Names { get; } = ["msg-html", "msg-rtf-html", "msg-rtf-plain", "msg-attached-message", "msg-ansi", "tnef-outlook", "tnef-plain"];
 
     internal static byte[] Get(string name) => name switch
     {
@@ -19,6 +19,8 @@ internal static class MsgFixtures
         "msg-rtf-plain" => RtfPlain().ToMsg(),
         "msg-attached-message" => AttachedMessage().ToMsg(),
         "msg-ansi" => Ansi().ToMsg(),
+        "tnef-outlook" => WithWinmail("Plain text that Outlook sends next to the winmail.dat.", OutlookTnef()),
+        "tnef-plain" => WithWinmail("The message's own text.", PlainTnef()),
         _ => throw new ArgumentException("No such fixture.", nameof(name)),
     };
 
@@ -93,4 +95,42 @@ internal static class MsgFixtures
             .Recipient("Ann Example", "ann@example.org")
             .String(0x1000, "Текст письма", MsgObject.Ansi, cyrillic);
     }
+
+    /// <summary>
+    /// What Outlook sends in its own format: a plain text body and a winmail.dat holding the HTML body (in compressed
+    /// RTF), an inline image, a PDF with a long name and an attached message.
+    /// </summary>
+    internal static byte[] OutlookTnef()
+    {
+        var attached = new TnefBuilder().Subject("Original question")
+            .MessageProperties(new TnefBuilder.Properties().Unicode(0x0C1A, "Ann Example").Unicode(0x5D01, "ann@example.org").Unicode(0x1000, "Could you send the figures?").Time(0x0039, Sent.AddDays(-1)))
+            .ToArray();
+        return new TnefBuilder()
+            .Subject("WINMAIL")
+            .MessageProperties(new TnefBuilder.Properties()
+                .Unicode(0x0037, "Quarterly report")
+                .Named("Keywords", "ignored")
+                .Int(0x3FDE, 1252)
+                .Binary(0x1009, MsgObject.RtfContainer(
+                    "{\\rtf1\\ansi\\ansicpg1252\\fromhtml1 {\\*\\htmltag19 <html><body>}{\\*\\htmltag64 <p>}Hello Ann, the report is attached.{\\*\\htmltag72 </p>}" +
+                    "{\\*\\htmltag84 <img src=\"cid:logo@example\">}{\\*\\htmltag27 </body></html>}}", compressed: true)))
+            .Attachment("LOGO.PNG", Fixture.Png, new TnefBuilder.Properties().Int(0x3705, 1).Unicode(0x3707, "logo.png").Unicode(0x370E, "image/png").Unicode(0x3712, "logo@example"))
+            .Attachment("REPORT~1.PDF", "%PDF-1.4\n%%EOF\n"u8.ToArray(), new TnefBuilder.Properties().Int(0x3705, 1).Unicode(0x3707, "Quarterly report 2026.pdf").Time(0x3008, Sent))
+            .Attachment("Original", null, new TnefBuilder.Properties().Int(0x3705, 5).Unicode(0x3001, "Original question").Message(0x3701, attached))
+            .ToArray();
+    }
+
+    /// <summary>A winmail.dat with only a rich text body, which does not replace the message's own text.</summary>
+    internal static byte[] PlainTnef() => new TnefBuilder()
+        .MessageProperties(new TnefBuilder.Properties().Binary(0x1009, MsgObject.RtfContainer("{\\rtf1\\ansi Rich text copy\\par }", compressed: false)))
+        .Attachment("NOTES.TXT", "notes"u8.ToArray(), new TnefBuilder.Properties().Int(0x3705, 1).Unicode(0x3707, "notes.txt"))
+        .ToArray();
+
+    /// <summary>An .eml with a plain text body and a winmail.dat attachment.</summary>
+    internal static byte[] WithWinmail(string text, byte[] tnef) => Encoding.ASCII.GetBytes(
+        "From: Example Sender <sender@example.com>\r\nTo: Ann Example <ann@example.org>\r\nSubject: Quarterly report\r\n" +
+        "Date: Sat, 14 Mar 2026 09:26:53 +0000\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b\"\r\n\r\n" +
+        "--b\r\nContent-Type: text/plain; charset=us-ascii\r\n\r\n" + text + "\r\n" +
+        "--b\r\nContent-Type: application/ms-tnef; name=\"winmail.dat\"\r\nContent-Disposition: attachment; filename=\"winmail.dat\"\r\n" +
+        "Content-Transfer-Encoding: base64\r\n\r\n" + Convert.ToBase64String(tnef, Base64FormattingOptions.InsertLineBreaks) + "\r\n--b--\r\n");
 }

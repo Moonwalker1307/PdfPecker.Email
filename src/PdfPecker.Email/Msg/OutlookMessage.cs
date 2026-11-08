@@ -58,25 +58,90 @@ internal static class OutlookMessage
     internal static (byte[] Buffer, int Length) ToMime(byte[] msg, EmailLimits limits, CancellationToken cancellationToken)
     {
         var file = CompoundFile.Open(msg);
+        if (file.Entries.Count == 0) return ([], 0);
+        return ToMime(new StorageObject(file, file.Entries[0], 32), msg.Length, limits, cancellationToken, headers: true, body: true);
+    }
+
+    /// <summary>
+    /// The MIME bytes of a message's MAPI properties, from an .msg file or a winmail.dat. Without
+    /// <paramref name="headers"/> only the content is written (a part to put in place of a winmail.dat), and without
+    /// <paramref name="body"/> only the attachments.
+    /// </summary>
+    internal static (byte[] Buffer, int Length) ToMime(MapiObject message, int sizeHint, EmailLimits limits, CancellationToken cancellationToken, bool headers, bool body)
+    {
         // Attachments dominate the size, and base64 lines of 76 characters make them 78/57 times larger.
-        var output = new MimeBuffer((int)Math.Min(Array.MaxLength, (long)msg.Length * 78 / 57 + 8192));
-        if (file.Entries.Count > 0)
-        {
-            var parts = 0;
-            new Writer(file, limits, cancellationToken, output).Message(file.Entries[0], embedded: false, depth: 0, ref parts);
-        }
+        var output = new MimeBuffer((int)Math.Min(Array.MaxLength, (long)sizeHint * 78 / 57 + 8192));
+        var parts = 0;
+        new Writer(limits, cancellationToken, output).Message(message, depth: 0, ref parts, headers, body);
         return (output.Buffer, output.Written.Length);
     }
 
-    private sealed class Writer(CompoundFile file, EmailLimits limits, CancellationToken cancellationToken, MimeBuffer output)
+    /// <summary>Whether the message has an HTML body, directly or encapsulated in compressed RTF.</summary>
+    internal static bool HasHtmlBody(MapiObject message) => Writer.Body(message).Html is not null;
+
+    /// <summary>Whether the message has any body text.</summary>
+    internal static bool HasBody(MapiObject message) => Writer.Body(message) is var (html, text) && (html is not null || !string.IsNullOrWhiteSpace(text));
+
+    private sealed class Writer(EmailLimits limits, CancellationToken cancellationToken, MimeBuffer output)
     {
-        internal void Message(DirectoryEntry storage, bool embedded, int depth, ref int parts)
+        internal void Message(MapiObject properties, int depth, ref int parts, bool headers = true, bool body = true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (depth >= limits.MaxNestingDepth)
                 throw new PdfLimitException($"The Outlook message nests attached messages deeper than {limits.MaxNestingDepth} (EmailLimits.MaxNestingDepth).");
-            var properties = new Properties(file, storage, embedded ? 24 : 32);
+            if (headers) MessageHeaders(properties);
 
+            var (html, text) = body ? Body(properties) : (null, null);
+            var inline = new List<MapiObject>();
+            var attached = new List<MapiObject>();
+            foreach (var attachment in properties.Attachments)
+            {
+                if (++parts > limits.MaxParts)
+                    throw new PdfLimitException($"The Outlook message has more than {limits.MaxParts} parts (EmailLimits.MaxParts).");
+                // Attachments with a Content-ID are the HTML's images; they go with the body in a multipart/related,
+                // and the rest are the message's attachments.
+                (html is not null && attachment.String(PropertyAttachContentId) is { Length: > 0 } ? inline : attached).Add(attachment);
+            }
+
+            var boundary = Boundary + depth.ToString(CultureInfo.InvariantCulture) + "-";
+            if (attached.Count == 0 && inline.Count == 0)
+            {
+                WriteBody(html, text, boundary + "a");
+                return;
+            }
+            Raw("Content-Type", $"multipart/mixed; boundary=\"{boundary}m\"");
+            output.Append("\r\n");
+            if (body)
+            {
+                output.Append("--").Append(boundary).Append("m\r\n");
+                if (inline.Count > 0)
+                {
+                    Raw("Content-Type", $"multipart/related; boundary=\"{boundary}r\"");
+                    output.Append("\r\n");
+                    output.Append("--").Append(boundary).Append("r\r\n");
+                    WriteBody(html, text, boundary + "a");
+                    foreach (var attachment in inline)
+                    {
+                        output.Append("--").Append(boundary).Append("r\r\n");
+                        Attachment(attachment, inlineImage: true, depth, ref parts);
+                    }
+                    output.Append("--").Append(boundary).Append("r--\r\n");
+                }
+                else
+                {
+                    WriteBody(html, text, boundary + "a");
+                }
+            }
+            foreach (var attachment in attached)
+            {
+                output.Append("--").Append(boundary).Append("m\r\n");
+                Attachment(attachment, inlineImage: false, depth, ref parts);
+            }
+            output.Append("--").Append(boundary).Append("m--\r\n");
+        }
+
+        private void MessageHeaders(MapiObject properties)
+        {
             // From and Sender: Outlook stores the mailbox the message is from as "sent representing", and the one who
             // sent it, when someone sent it on another's behalf, as the sender.
             var sender = Mailbox(properties.String(PropertySenderName), properties.String(PropertySenderSmtp), properties.String(PropertySenderEmail));
@@ -96,59 +161,9 @@ internal static class OutlookMessage
             if (properties.String(PropertyMessageId) is { Length: > 0 } id) Raw("Message-ID", id);
             CopyHeader(transport, "Content-Language");
             Raw("MIME-Version", "1.0");
-
-            var (html, text) = Body(properties);
-            var children = file.Children(storage);
-            var inline = new List<DirectoryEntry>();
-            var attached = new List<DirectoryEntry>();
-            foreach (var (name, entry) in children)
-            {
-                if (entry.Type != 1 || !name.StartsWith("__attach_version1.0_", StringComparison.OrdinalIgnoreCase)) continue;
-                if (++parts > limits.MaxParts)
-                    throw new PdfLimitException($"The Outlook message has more than {limits.MaxParts} parts (EmailLimits.MaxParts).");
-                // Attachments with a Content-ID are the HTML's images; they go with the body in a multipart/related,
-                // and the rest are the message's attachments.
-                (html is not null && new Properties(file, entry, 8).String(PropertyAttachContentId) is { Length: > 0 } ? inline : attached).Add(entry);
-            }
-            // Directory order is a tree order, not the order in which the attachments were added; their names count up.
-            inline.Sort(static (a, b) => string.CompareOrdinal(a.Name, b.Name));
-            attached.Sort(static (a, b) => string.CompareOrdinal(a.Name, b.Name));
-
-            var boundary = Boundary + depth.ToString(CultureInfo.InvariantCulture) + "-";
-            if (attached.Count == 0 && inline.Count == 0)
-            {
-                WriteBody(html, text, boundary + "a");
-                return;
-            }
-            Raw("Content-Type", $"multipart/mixed; boundary=\"{boundary}m\"");
-            output.Append("\r\n");
-            output.Append("--").Append(boundary).Append("m\r\n");
-            if (inline.Count > 0)
-            {
-                Raw("Content-Type", $"multipart/related; boundary=\"{boundary}r\"");
-                output.Append("\r\n");
-                output.Append("--").Append(boundary).Append("r\r\n");
-                WriteBody(html, text, boundary + "a");
-                foreach (var entry in inline)
-                {
-                    output.Append("--").Append(boundary).Append("r\r\n");
-                    Attachment(entry, inlineImage: true, depth, ref parts);
-                }
-                output.Append("--").Append(boundary).Append("r--\r\n");
-            }
-            else
-            {
-                WriteBody(html, text, boundary + "a");
-            }
-            foreach (var entry in attached)
-            {
-                output.Append("--").Append(boundary).Append("m\r\n");
-                Attachment(entry, inlineImage: false, depth, ref parts);
-            }
-            output.Append("--").Append(boundary).Append("m--\r\n");
         }
 
-        private static (string? Html, string? Text) Body(Properties properties)
+        internal static (string? Html, string? Text) Body(MapiObject properties)
         {
             var text = properties.String(PropertyBody);
             if (properties.Binary(PropertyHtml) is { Length: > 0 } htmlBytes)
@@ -189,9 +204,8 @@ internal static class OutlookMessage
             output.Base64(Mime.Charsets.Utf8Encoding.GetBytes(content));
         }
 
-        private void Attachment(DirectoryEntry storage, bool inlineImage, int depth, ref int parts)
+        private void Attachment(MapiObject properties, bool inlineImage, int depth, ref int parts)
         {
-            var properties = new Properties(file, storage, 8);
             var method = properties.Int(PropertyAttachMethod) ?? 1;
             var name = properties.String(PropertyAttachLongFileName) ?? properties.String(PropertyAttachFileName) ?? properties.String(PropertyDisplayName);
             var disposition = inlineImage ? "inline" : "attachment";
@@ -200,15 +214,16 @@ internal static class OutlookMessage
             // An attached message is a storage of its own, written out as a message/rfc822 part.
             // It is written in place as 8bit rather than base64, which would make every level of nesting a third
             // larger than the one inside it.
-            if (method == 5 && properties.Storage("__substg1.0_3701000D") is { } embedded)
+            if (method == 5 && properties.EmbeddedMessage is { } embedded)
             {
-                if (string.IsNullOrWhiteSpace(name)) name = new Properties(file, embedded, 24).String(PropertySubject);
+                // The display name is the attached message's subject; the short file name is a truncated copy of it.
+                name = properties.String(PropertyDisplayName) ?? properties.String(PropertyAttachLongFileName) ?? embedded.String(PropertySubject) ?? name;
                 name = string.IsNullOrWhiteSpace(name) ? "message.eml" : name.EndsWith(".eml", StringComparison.OrdinalIgnoreCase) ? name : name + ".eml";
                 Raw("Content-Type", "message/rfc822");
                 Raw("Content-Disposition", disposition + "; " + FileNameParameter(name) + dates);
                 Raw("Content-Transfer-Encoding", "8bit");
                 output.Append("\r\n");
-                Message(embedded, embedded: true, depth + 1, ref parts);
+                Message(embedded, depth + 1, ref parts);
                 return;
             }
 
@@ -234,7 +249,7 @@ internal static class OutlookMessage
             output.Base64(data);
         }
 
-        private static string DateParameters(Properties properties)
+        private static string DateParameters(MapiObject properties)
         {
             var result = "";
             if (properties.Time(PropertyCreationTime) is { } created)
@@ -244,20 +259,13 @@ internal static class OutlookMessage
             return result;
         }
 
-        private void WriteRecipients(Properties message)
+        private void WriteRecipients(MapiObject message)
         {
             var to = new List<string>();
             var cc = new List<string>();
             var bcc = new List<string>();
-            var recipients = new List<(string Name, DirectoryEntry Entry)>();
-            foreach (var (name, entry) in message.Children)
+            foreach (var properties in message.Recipients)
             {
-                if (entry.Type == 1 && name.StartsWith("__recip_version1.0_", StringComparison.OrdinalIgnoreCase)) recipients.Add((name, entry));
-            }
-            recipients.Sort(static (a, b) => string.CompareOrdinal(a.Name, b.Name));
-            foreach (var (_, entry) in recipients)
-            {
-                var properties = new Properties(file, entry, 8);
                 var mailbox = Mailbox(properties.String(PropertyDisplayName), properties.String(PropertySmtpAddress), properties.String(PropertyEmailAddress));
                 if (mailbox is null) continue;
                 (properties.Int(PropertyRecipientType) switch { 2 => cc, 3 => bcc, _ => to }).Add(mailbox);
@@ -452,12 +460,13 @@ internal static class OutlookMessage
     }
 
     /// <summary>The MAPI properties of one object (message, recipient or attachment) in a .msg file.</summary>
-    private sealed class Properties
+    private sealed class StorageObject : MapiObject
     {
         private readonly CompoundFile _file;
         private readonly Dictionary<int, (int Type, long Value)> _fixed = [];
+        private List<MapiObject>? _recipients, _attachments;
 
-        internal Properties(CompoundFile file, DirectoryEntry storage, int headerSize)
+        internal StorageObject(CompoundFile file, DirectoryEntry storage, int headerSize)
         {
             _file = file;
             Children = file.Children(storage);
@@ -474,12 +483,12 @@ internal static class OutlookMessage
             Encoding = RtfText.CodePage(codePage);
         }
 
-        internal Dictionary<string, DirectoryEntry> Children { get; }
+        private Dictionary<string, DirectoryEntry> Children { get; }
 
         /// <summary>The encoding of the object's 8-bit strings and HTML.</summary>
-        internal Encoding Encoding { get; }
+        internal override Encoding Encoding { get; }
 
-        internal string? String(int id)
+        internal override string? String(int id)
         {
             var name = "__substg1.0_" + id.ToString("X4", CultureInfo.InvariantCulture);
             if (Children.TryGetValue(name + "001F", out var unicode))
@@ -489,24 +498,33 @@ internal static class OutlookMessage
             return null;
         }
 
-        internal byte[]? Binary(int id) =>
+        internal override byte[]? Binary(int id) =>
             Children.TryGetValue("__substg1.0_" + id.ToString("X4", CultureInfo.InvariantCulture) + "0102", out var entry) ? _file.Read(entry) : null;
 
-        internal DirectoryEntry? Storage(string name) => Children.TryGetValue(name, out var entry) && entry.Type == 1 ? entry : null;
+        internal override IReadOnlyList<MapiObject> Recipients => _recipients ??= Storages("__recip_version1.0_", 8);
 
-        internal int? Int(int id) => _fixed.TryGetValue(id, out var p) && p.Type == 0x0003 ? (int)p.Value : null;
+        internal override IReadOnlyList<MapiObject> Attachments => _attachments ??= Storages("__attach_version1.0_", 8);
 
-        internal bool? Bool(int id) => _fixed.TryGetValue(id, out var p) && p.Type == 0x000B ? (p.Value & 0xFFFF) != 0 : null;
+        internal override MapiObject? EmbeddedMessage =>
+            Children.TryGetValue("__substg1.0_3701000D", out var entry) && entry.Type == 1 ? new StorageObject(_file, entry, 24) : null;
 
-        /// <summary>A PT_SYSTIME property in UTC, or null when it is missing or out of range.</summary>
-        internal DateTimeOffset? Time(int id)
+        // Directory order is a tree order, not the order in which the objects were added; their names count up.
+        private List<MapiObject> Storages(string prefix, int headerSize)
         {
-            if (!_fixed.TryGetValue(id, out var p) || p.Type != 0x0040) return null;
-            // Outlook writes 0x0CA8A4F3_4F3E0000 and similar "none" values far in the future for unset dates.
-            if (p.Value <= 0 || p.Value >= DateTime.MaxValue.ToFileTimeUtc() - 1) return null;
-            var date = DateTimeOffset.FromFileTime(p.Value).ToUniversalTime();
-            return date.Year is < 1980 or > 4000 ? null : date;
+            var found = new List<(string Name, DirectoryEntry Entry)>();
+            foreach (var (name, entry) in Children)
+            {
+                if (entry.Type == 1 && name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) found.Add((name, entry));
+            }
+            found.Sort(static (a, b) => string.CompareOrdinal(a.Name, b.Name));
+            return found.ConvertAll(f => (MapiObject)new StorageObject(_file, f.Entry, headerSize));
         }
+
+        internal override int? Int(int id) => _fixed.TryGetValue(id, out var p) && p.Type == 0x0003 ? (int)p.Value : null;
+
+        internal override bool? Bool(int id) => _fixed.TryGetValue(id, out var p) && p.Type == 0x000B ? (p.Value & 0xFFFF) != 0 : null;
+
+        internal override DateTimeOffset? Time(int id) => _fixed.TryGetValue(id, out var p) && p.Type == 0x0040 ? FromFileTime(p.Value) : null;
 
         private static string TrimNul(string value)
         {
