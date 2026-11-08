@@ -11,7 +11,7 @@ on:
         description: Minutes to fuzz each target
         default: "10"
       target:
-        description: One target name (eml, parse, html, sanitize), or "all"
+        description: One target name (eml, parse, html, sanitize, msg, rtf), or "all"
         default: all
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
     steps:
       - id: pick
         env:
-          ALL: eml parse html sanitize
+          ALL: eml parse html sanitize msg rtf
           TARGET: ${{ github.event_name == 'schedule' && 'all' || inputs.target }}
         run: |
           if [ "$TARGET" = "all" ]; then

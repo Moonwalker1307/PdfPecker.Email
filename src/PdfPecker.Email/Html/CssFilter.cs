@@ -4,8 +4,8 @@ namespace PdfPecker.Email.Html;
 
 /// <summary>
 /// Keeps a message's CSS from reaching outside the message body. Every selector is scoped to the body's wrapper
-/// element (html and body become the wrapper itself, as web mail clients do), @page and @import rules are dropped so
-/// the message cannot change the PDF's pages or pull in other files, and fixed or absolute positioning is removed so
+/// element (html and body become the wrapper itself, as web mail clients do), @page and @import rules and named pages
+/// are dropped so the message cannot change the PDF's pages or pull in other files, and fixed or absolute positioning is removed so
 /// the body cannot paint over the header PdfPecker.Email writes above it.
 /// </summary>
 internal static class CssFilter
@@ -231,6 +231,8 @@ internal static class CssFilter
                 || value.Contains("absolute", StringComparison.OrdinalIgnoreCase) || value.Contains("sticky", StringComparison.OrdinalIgnoreCase)
                 || value.Contains("running", StringComparison.OrdinalIgnoreCase));
         }
+        // A named page starts a new PDF page; Word's HTML, which Outlook sends, puts every message in "page: WordSection1".
+        if (property.Equals("page", StringComparison.OrdinalIgnoreCase)) return false;
         return !property.Equals("behavior", StringComparison.OrdinalIgnoreCase) && !property.Equals("-moz-binding", StringComparison.OrdinalIgnoreCase);
     }
 

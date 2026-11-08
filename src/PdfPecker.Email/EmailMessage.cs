@@ -3,8 +3,8 @@ using PdfPecker.Email.Mime;
 namespace PdfPecker.Email;
 
 /// <summary>
-/// An e-mail message read from its MIME source (an .eml file): the headers, the body that a mail client would show and
-/// the attachments. Reading never fails on damaged mail; it fails only when a message goes over one of the
+/// An e-mail message read from its MIME source (an .eml file) or from an Outlook .msg file: the headers, the body that a
+/// mail client would show and the attachments. Reading never fails on damaged mail; it fails only when a message goes over one of the
 /// <see cref="EmailLimits"/>.
 /// </summary>
 public sealed partial class EmailMessage
@@ -50,7 +50,10 @@ public sealed partial class EmailMessage
         }
     }
 
-    /// <summary>Reads a message from its MIME bytes, such as the content of an .eml file.</summary>
+    /// <summary>
+    /// Reads a message from its MIME bytes, such as the content of an .eml file, or from an Outlook .msg file, which is
+    /// recognised by its content.
+    /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="message"/> is null.</exception>
     /// <exception cref="PdfLimitException">The message goes over a limit in <paramref name="limits"/>.</exception>
     public static EmailMessage Parse(byte[] message, EmailLimits? limits = null) => Parse(message, limits, CancellationToken.None);
@@ -62,7 +65,18 @@ public sealed partial class EmailMessage
     public static EmailMessage Parse(byte[] message, EmailLimits? limits, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        return new EmailMessage(message, MimeParser.Parse(message, limits ?? EmailLimits.Default, cancellationToken));
+        limits ??= EmailLimits.Default;
+        if (Msg.CompoundFile.IsCompoundFile(message))
+        {
+            if (message.Length > limits.MaxMessageBytes)
+                throw new PdfLimitException($"The message is {message.Length} bytes, over the limit of {limits.MaxMessageBytes} (EmailLimits.MaxMessageBytes).");
+            // The MIME written for an Outlook message is base64 and so larger than the file; the size limit was
+            // checked on the file, and the parts and nesting limits still apply to the MIME.
+            var (mime, length) = Msg.OutlookMessage.ToMime(message, limits, cancellationToken);
+            var relaxed = new EmailLimits { MaxMessageBytes = int.MaxValue, MaxParts = limits.MaxParts * 3 + 3, MaxNestingDepth = limits.MaxNestingDepth * 3 + 3 };
+            return new EmailMessage(mime, MimeParser.Parse(mime, length, relaxed, cancellationToken)) { IsOutlookMessage = true, Original = message };
+        }
+        return new EmailMessage(message, MimeParser.Parse(message, limits, cancellationToken));
     }
 
     /// <summary>Reads a message from a stream, up to <see cref="EmailLimits.MaxMessageBytes"/>.</summary>
@@ -76,7 +90,7 @@ public sealed partial class EmailMessage
         return Parse(ReadAll(message, limits.MaxMessageBytes), limits);
     }
 
-    /// <summary>Reads a message from an .eml file.</summary>
+    /// <summary>Reads a message from an .eml or Outlook .msg file.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
     /// <exception cref="PdfLimitException">The file goes over a limit in <paramref name="limits"/>.</exception>
     /// <exception cref="IOException">The file cannot be read.</exception>
@@ -108,8 +122,19 @@ public sealed partial class EmailMessage
         return buffer.Length == buffer.Capacity ? buffer.GetBuffer() : buffer.ToArray();
     }
 
-    /// <summary>The message's MIME source.</summary>
+    /// <summary>
+    /// The buffer that holds the message's MIME source; for an Outlook message, the MIME written for it, which may be
+    /// followed by unused bytes. Parts refer to ranges of it.
+    /// </summary>
     internal byte[] Source { get; }
+
+    /// <summary>Whether the message was read from an Outlook .msg file.</summary>
+    internal bool IsOutlookMessage { get; private init; }
+
+    /// <summary>The bytes the message was read from: the .msg file for an Outlook message, else the MIME source.</summary>
+    internal byte[] Original { get => _original ?? Source; private init => _original = value; }
+
+    private byte[]? _original;
 
     /// <summary>The subject, decoded; null when the message has none.</summary>
     public string? Subject { get; }

@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/PdfPecker.Email/PdfPecker.Email.csproj" />
+    <Compile Include="../../tests/PdfPecker.Email.Tests/Msg/MsgBuilder.cs;../../tests/PdfPecker.Email.Tests/Msg/MsgFixtures.cs;../../tests/PdfPecker.Email.Tests/Fixture.cs" Link="seeds/%(Filename)%(Extension)" />
     <None Include="../../tests/PdfPecker.Email.Tests/Fixtures/*.eml" Link="seeds/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

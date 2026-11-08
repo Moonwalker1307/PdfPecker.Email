@@ -10,6 +10,9 @@ internal static class Fixture
 
     internal static EmailMessage Message(string name) => EmailMessage.Parse(Bytes(name));
 
+    /// <summary>A one-pixel PNG.</summary>
+    internal static byte[] Png { get; } = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==");
+
     /// <summary>A message from text, with CRLF line ends as on the wire.</summary>
     internal static EmailMessage FromText(string text, EmailLimits? limits = null)
         => EmailMessage.Parse(System.Text.Encoding.UTF8.GetBytes(text.Replace("\r\n", "\n").Replace("\n", "\r\n")), limits);

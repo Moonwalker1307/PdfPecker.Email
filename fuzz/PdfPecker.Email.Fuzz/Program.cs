@@ -5,6 +5,8 @@ using System.Text;
 using PdfPecker;
 using PdfPecker.Email;
 using PdfPecker.Email.Html;
+using PdfPecker.Email.Msg;
+using PdfPecker.Email.Tests.Msg;
 
 namespace PdfPecker.Email.Fuzz;
 
@@ -16,7 +18,7 @@ namespace PdfPecker.Email.Fuzz;
 /// </summary>
 internal static class Program
 {
-    private static readonly string[] Targets = ["eml", "parse", "html", "sanitize"];
+    private static readonly string[] Targets = ["eml", "parse", "html", "sanitize", "msg", "rtf"];
 
     private static int Main(string[] args)
     {
@@ -142,6 +144,18 @@ internal static class Program
                 if (again.ToString() != output.ToString()) throw new InvalidOperationException("Sanitised HTML changed when sanitised again.");
                 break;
             }
+            case "msg":
+            {
+                // An Outlook file that still parses goes through the whole conversion.
+                var m = EmailMessage.Parse(input, null, cancellationToken);
+                foreach (var a in m.Attachments) _ = a.Data.Length;
+                EmailToPdf.Convert(m, FuzzOptions, cancellationToken);
+                break;
+            }
+            case "rtf":
+                _ = RtfText.Read(CompressedRtf.Decompress(input));
+                _ = RtfText.Read(input);
+                break;
         }
     }
 }
@@ -201,7 +215,7 @@ internal sealed class Worker(Options o)
 
     public int Run()
     {
-        var seeds = Seeds.Load();
+        var seeds = Seeds.Load(o.Target);
         Directory.CreateDirectory(Path.Combine(o.Out, o.Target));
         var current = CurrentPath(o, o.Target, o.Lane);
         var clock = Stopwatch.StartNew();
@@ -209,7 +223,7 @@ internal sealed class Worker(Options o)
         var nextReport = TimeSpan.FromSeconds(20);
         while (clock.Elapsed < o.Duration)
         {
-            var input = Mutator.Mutate(seeds, _random);
+            var input = Mutator.Mutate(seeds, _random, binary: o.Target is "msg" or "rtf");
             File.WriteAllBytes(current, input);
             var verdict = Execute(input);
             executions++;
@@ -304,9 +318,26 @@ internal static class Findings
 
 internal static class Seeds
 {
-    public static List<byte[]> Load()
+    public static List<byte[]> Load(string target)
     {
         var list = new List<byte[]>();
+        // The Outlook targets start from the .msg files the tests write, and the RTF in them.
+        if (target == "msg")
+        {
+            foreach (var name in MsgFixtures.Names) list.Add(MsgFixtures.Get(name));
+            return list;
+        }
+        if (target == "rtf")
+        {
+            foreach (var message in new[] { MsgFixtures.RtfHtml(), MsgFixtures.RtfPlain() })
+            {
+                var container = message.Streams["__substg1.0_10090102"];
+                list.Add(container);
+                list.Add(CompressedRtf.Decompress(container));
+            }
+            list.Add(Convert.FromHexString("2d0000002b0000004c5a4675f1c5c7a703000a007263706731323542320af32068656c090020627705b06c647d0a800fa0"));
+            return list;
+        }
         var dir = Path.Combine(AppContext.BaseDirectory, "seeds");
         if (Directory.Exists(dir))
         {
@@ -333,9 +364,26 @@ internal static class Mutator
         "<table><tr><td>"u8.ToArray(), "http://"u8.ToArray(), " \r\n"u8.ToArray(), "\0"u8.ToArray(), [0xC3], [0xFF, 0xFE],
     ];
 
-    public static byte[] Mutate(List<byte[]> seeds, Random random)
+    public static byte[] Mutate(List<byte[]> seeds, Random random, bool binary = false)
     {
         var data = new List<byte>(seeds[random.Next(seeds.Count)]);
+        // Binary formats keep their offsets when bytes are changed in place, so most of their mutations do that; the
+        // rest insert, cut and repeat as for text.
+        if (binary && random.Next(4) != 0)
+        {
+            var flips = 1 + random.Next(random.Next(4) == 0 ? 64 : 8);
+            for (var k = 0; k < flips && data.Count > 0; k++)
+            {
+                var at = random.Next(data.Count);
+                data[at] = random.Next(3) switch
+                {
+                    0 => (byte)(data[at] ^ 1 << random.Next(8)),
+                    1 => (byte)random.Next(256),
+                    _ => random.Next(2) == 0 ? (byte)0xFF : (byte)0,
+                };
+            }
+            return data.ToArray();
+        }
         var count = 1 + random.Next(random.Next(8) == 0 ? 40 : 6);
         for (var k = 0; k < count; k++)
         {

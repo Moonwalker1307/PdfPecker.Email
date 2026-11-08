@@ -5,7 +5,7 @@ using PdfPecker;
 using PdfPecker.Email;
 
 // Times reading and converting messages: the test fixtures, and generated ones that stand for a newsletter, a long
-// thread and a message with large attachments. Each case is warmed up, then run until it has taken about two seconds,
+// thread and a message with large attachments, as .eml and as Outlook .msg. Each case is warmed up, then run until it has taken about two seconds,
 // and the median time and the bytes allocated per run are printed. Compare versions on one machine only.
 var cases = new List<(string Name, byte[] Eml)>();
 var fixtures = Path.Combine(AppContext.BaseDirectory, "fixtures");
@@ -14,6 +14,9 @@ foreach (var file in Directory.GetFiles(fixtures, "*.eml").Order(StringComparer.
 cases.Add(("generated-newsletter", Generated.Newsletter()));
 cases.Add(("generated-thread", Generated.Thread()));
 cases.Add(("generated-attachments-20mb", Generated.Attachments()));
+foreach (var name in PdfPecker.Email.Tests.Msg.MsgFixtures.Names) cases.Add((name, PdfPecker.Email.Tests.Msg.MsgFixtures.Get(name)));
+cases.Add(("generated-msg-newsletter", Generated.MsgNewsletter()));
+cases.Add(("generated-msg-attachments-20mb", Generated.MsgAttachments()));
 
 var filter = args.Length > 0 ? args[0] : null;
 Console.WriteLine($"{"case",-28} {"size",10} {"parse",10} {"convert",10} {"alloc/conv",12} {"pdf",10}");
@@ -65,11 +68,7 @@ internal static class Generated
     /// <summary>A newsletter: HTML with a style sheet, 40 table rows of articles and quoted-printable encoding.</summary>
     public static byte[] Newsletter()
     {
-        var html = new StringBuilder("<html><head><style>body{font-family:Arial} .a{color:#333} td{padding:8px} @media (max-width:600px){td{padding:2px}}</style></head><body><table width=\"600\">");
-        for (var i = 0; i < 40; i++)
-            html.Append(CultureInfo.InvariantCulture, $"<tr><td class=\"a\"><h2>Article {i}</h2><p style=\"margin:0 0 8px 0\">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. <a href=\"https://example.com/a/{i}?utm_source=news\">Read more</a></p></td></tr>");
-        html.Append("</table></body></html>");
-        var qp = html.ToString().Replace("=", "=3D", StringComparison.Ordinal);
+        var qp = NewsletterHtml().Replace("=", "=3D", StringComparison.Ordinal);
         return Encoding.ASCII.GetBytes("From: News <news@example.com>\r\nTo: a@example.com\r\nSubject: Newsletter\r\nDate: Sun, 8 Nov 2026 10:00:00 +0000\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nPlain\r\n--b\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" + qp + "\r\n--b--\r\n");
     }
 
@@ -80,6 +79,39 @@ internal static class Generated
         for (var i = 0; i < 300; i++)
             text.Append(new string('>', i % 4)).Append(" On day ").Append(i).Append(" someone wrote that the budget needs another look, see https://example.com/doc/").Append(i).Append("\r\n");
         return Encoding.UTF8.GetBytes("From: a@example.com\r\nSubject: Re: Budget\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n" + text);
+    }
+
+    private static string NewsletterHtml()
+    {
+        var html = new StringBuilder("<html><head><style>body{font-family:Arial} .a{color:#333} td{padding:8px} @media (max-width:600px){td{padding:2px}}</style></head><body><table width=\"600\">");
+        for (var i = 0; i < 40; i++)
+            html.Append(CultureInfo.InvariantCulture, $"<tr><td class=\"a\"><h2>Article {i}</h2><p style=\"margin:0 0 8px 0\">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. <a href=\"https://example.com/a/{i}?utm_source=news\">Read more</a></p></td></tr>");
+        return html.Append("</table></body></html>").ToString();
+    }
+
+    /// <summary>The newsletter as Outlook keeps it: HTML encapsulated in compressed RTF.</summary>
+    public static byte[] MsgNewsletter()
+    {
+        var html = NewsletterHtml().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("{", "\\{", StringComparison.Ordinal).Replace("}", "\\}", StringComparison.Ordinal);
+        return new PdfPecker.Email.Tests.Msg.MsgObject()
+            .String(0x0037, "Newsletter").String(0x0C1A, "News").String(0x5D01, "news@example.com")
+            .Recipient("A", "a@example.com")
+            .Binary(0x1009, PdfPecker.Email.Tests.Msg.MsgObject.RtfContainer("{\\rtf1\\ansi\\fromhtml1 {\\*\\htmltag0 " + html + "}}", compressed: true))
+            .ToMsg();
+    }
+
+    /// <summary>A short Outlook message with four 5 MB attachments.</summary>
+    public static byte[] MsgAttachments()
+    {
+        var random = new Random(3);
+        var message = new PdfPecker.Email.Tests.Msg.MsgObject().String(0x0037, "Files").String(0x1000, "See attached.");
+        for (var i = 0; i < 4; i++)
+        {
+            var data = new byte[5 * 1024 * 1024];
+            random.NextBytes(data);
+            message.Attach($"file{i}.bin", data);
+        }
+        return message.ToMsg();
     }
 
     /// <summary>A short message with four 5 MB attachments in base64.</summary>

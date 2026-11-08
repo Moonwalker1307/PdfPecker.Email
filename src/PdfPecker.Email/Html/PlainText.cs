@@ -78,12 +78,15 @@ internal static class PlainText
             }
             var e = at;
             while (e < text.Length && !char.IsWhiteSpace(text[e]) && text[e] is not ('<' or '>' or '"' or '\'' or '`')) e++;
-            // Trailing punctuation belongs to the sentence, and a closing bracket only when it has no opening one.
+            // Trailing punctuation belongs to the sentence, and a closing bracket only when it has no opening one. The
+            // brackets are counted once, so a run of them is not counted again for every one taken off.
+            var open = text.AsSpan(at, e - at).Count('(');
+            var close = text.AsSpan(at, e - at).Count(')');
             while (e > at)
             {
                 var last = text[e - 1];
                 if (last is '.' or ',' or ';' or ':' or '!' or '?') { e--; continue; }
-                if (last == ')' && text.AsSpan(at, e - at).Count('(') < text.AsSpan(at, e - at).Count(')')) { e--; continue; }
+                if (last == ')' && open < close) { e--; close--; continue; }
                 break;
             }
             var minimum = text[at] is 'w' or 'W' ? 5 : text[at] is 'm' or 'M' ? 8 : 9;
@@ -98,14 +101,24 @@ internal static class PlainText
         return -1;
     }
 
+    private static readonly System.Buffers.SearchValues<char> StartLetters = System.Buffers.SearchValues.Create("hHwWmM");
+
+    // One pass over the text for the first letter of any prefix: searching for each prefix in turn would scan the rest
+    // of the text for the prefixes that are not there once per candidate, which is quadratic.
     private static int IndexOfStart(string text, int from)
     {
-        var best = -1;
-        foreach (var prefix in (ReadOnlySpan<string>)["http://", "https://", "www.", "mailto:"])
+        var i = from;
+        while (i < text.Length)
         {
-            var at = text.IndexOf(prefix, from, StringComparison.OrdinalIgnoreCase);
-            if (at >= 0 && (best < 0 || at < best)) best = at;
+            var next = text.AsSpan(i).IndexOfAny(StartLetters);
+            if (next < 0) return -1;
+            var at = i + next;
+            var rest = text.AsSpan(at);
+            if (rest.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || rest.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                || rest.StartsWith("www.", StringComparison.OrdinalIgnoreCase) || rest.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+                return at;
+            i = at + 1;
         }
-        return best;
+        return -1;
     }
 }

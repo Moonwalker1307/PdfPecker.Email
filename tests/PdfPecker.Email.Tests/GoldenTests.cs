@@ -11,6 +11,7 @@ public sealed class GoldenTests
         var data = new TheoryData<string>();
         foreach (var file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "Fixtures"), "*.eml").Order(StringComparer.Ordinal))
             data.Add(Path.GetFileNameWithoutExtension(file));
+        foreach (var name in Msg.MsgFixtures.Names) data.Add(name);
         return data;
     }
 
@@ -18,7 +19,7 @@ public sealed class GoldenTests
     [MemberData(nameof(Fixtures))]
     public void Html_matches_the_baseline(string name)
     {
-        var html = Fixture.Html(Fixture.Message(name + ".eml")).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var html = Fixture.Html(EmailMessage.Parse(Bytes(name))).Replace("\r\n", "\n", StringComparison.Ordinal);
         var golden = Path.Combine(SourceDirectory(), "Golden", name + ".html");
         if (Environment.GetEnvironmentVariable("PDFPECKER_UPDATE_GOLDEN") == "1")
         {
@@ -33,9 +34,12 @@ public sealed class GoldenTests
     [MemberData(nameof(Fixtures))]
     public void Every_fixture_converts(string name)
     {
-        var pdf = EmailToPdf.Convert(Fixture.Bytes(name + ".eml"));
+        var pdf = EmailToPdf.Convert(Bytes(name));
         Assert.True(PdfToImage.GetPageCount(pdf) >= 1);
     }
+
+    // The Outlook fixtures are written by the tests, so no real person's .msg file is checked in.
+    private static byte[] Bytes(string name) => name.StartsWith("msg-", StringComparison.Ordinal) ? Msg.MsgFixtures.Get(name) : Fixture.Bytes(name + ".eml");
 
     private static string SourceDirectory([System.Runtime.CompilerServices.CallerFilePath] string path = "") => Path.GetDirectoryName(path)!;
 }

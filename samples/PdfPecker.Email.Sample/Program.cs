@@ -1,10 +1,10 @@
 using PdfPecker;
 using PdfPecker.Email;
 
-// eml2pdf message.eml message.pdf [--pdfa] [--original] [--text]
+// eml2pdf message.eml message.pdf [--pdfa] [--original] [--text]  (an Outlook .msg file works too)
 if (args.Length < 2)
 {
-    Console.Error.WriteLine("usage: eml2pdf <message.eml> <message.pdf> [--pdfa] [--original] [--text]");
+    Console.Error.WriteLine("usage: eml2pdf <message.eml|message.msg> <message.pdf> [--pdfa] [--original] [--text]");
     return 2;
 }
 var options = new EmailPdfOptions

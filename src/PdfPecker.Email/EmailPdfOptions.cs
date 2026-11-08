@@ -23,12 +23,14 @@ public sealed class EmailPdfOptions
     public bool EmbedAttachments { get; set; } = true;
 
     /// <summary>
-    /// Also embed the original message as an .eml file, with the PDF/A-3 relationship Source, so the archived PDF keeps
-    /// the message exactly as received. Default: false.
+    /// Also embed the original message as an .eml file (or the .msg file an Outlook message was read from), with the
+    /// PDF/A-3 relationship Source, so the archived PDF keeps the message exactly as received. Default: false.
     /// </summary>
     public bool EmbedOriginalMessage { get; set; }
 
-    /// <summary>The file name of the embedded original message. Default: "message.eml".</summary>
+    /// <summary>
+    /// The file name of the embedded original message. Default: "message.eml"; an Outlook message's ".eml" becomes ".msg".
+    /// </summary>
     public string OriginalMessageFileName { get; set; } = "message.eml";
 
     /// <summary>Write the header block (subject, sender, date, recipients, attachments) above the body. Default: true.</summary>

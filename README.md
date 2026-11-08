@@ -2,10 +2,10 @@
 
 # PdfPecker.Email
 
-E-mail to PDF for .NET: convert `.eml` messages (MIME) to PDF and PDF/A-3, with the header block, the body as a mail
-client shows it, its inline images, and the attachments embedded in the PDF. It uses
+E-mail to PDF for .NET: convert `.eml` messages (MIME) and Outlook `.msg` files to PDF and PDF/A-3, with the header
+block, the body as a mail client shows it, its inline images, and the attachments embedded in the PDF. It uses
 [PdfPecker](https://www.nuget.org/packages/PdfPecker) for the PDF and has no other dependency: its own MIME parser,
-header decoders, HTML sanitiser and CSS filter, on the .NET base class library.
+Outlook reader, header decoders, HTML sanitiser and CSS filter, on the .NET base class library.
 
 ```csharp
 using PdfPecker;
@@ -13,6 +13,9 @@ using PdfPecker.Email;
 
 // An .eml file to a PDF, with the attachments embedded
 EmailToPdf.ConvertFile("message.eml", "message.pdf");
+
+// An Outlook .msg file is read the same way: the format is recognised from the content
+EmailToPdf.ConvertFile("message.msg", "message.pdf");
 
 // PDF/A-3u for archiving, keeping the original message inside the PDF as well
 byte[] pdf = EmailToPdf.Convert(File.ReadAllBytes("message.eml"), new EmailPdfOptions
@@ -39,6 +42,12 @@ PdfPecker.
   the usual aliases and misspellings (ISO-8859-x, Windows-125x, KOI8, Shift_JIS, GB18030, Big5, EUC-KR, ...), and
   UTF-8 or Windows-1252 when a part has none. Damaged mail (a missing closing boundary, broken base64, a part without
   headers, an mbox `From ` line) is shown as far as it can be read.
+- **Outlook `.msg` files.** Every method that takes a message also takes the bytes of an `.msg` file (recognised by
+  its content, not its name): its own compound file reader takes out the subject, sender (and "on behalf of"),
+  recipients, date, Reply-To, the HTML body (also when Outlook kept it only as compressed RTF), the plain text or rich
+  text body, inline images, attachments and attached Outlook messages, which become `.eml` attachments. 8-bit
+  strings of older Outlook versions are read in the message's code page, and Exchange addresses without an SMTP
+  address are left out.
 - **The body a mail client shows.** The HTML alternative (or the plain text one, with `PreferPlainText`), the root
   of a multipart/related, inline images by `cid:` and `Content-Location`, images placed between text parts (Apple
   Mail), and plain text with format=flowed paragraphs joined and links made clickable.
@@ -47,7 +56,7 @@ PdfPecker.
 - **Attachments in the PDF.** Every attachment, attached message (as an `.eml` file), calendar invitation and
   unreferenced inline image is embedded with its MIME type and dates and listed in the viewer's attachments panel.
   With PDF/A-3 they become associated files (relationship Supplement), and `EmbedOriginalMessage` adds the message
-  itself (relationship Source).
+  itself (relationship Source), as the `.msg` file when it was one.
 - **PDF metadata.** The title, author and language default to the subject, the sender and Content-Language; all of
   PdfPecker's options work: page size, margins, fonts, PDF/A, PDF/UA, encryption and signing.
 - **`EmailMessage`** reads a message without converting it: subject, addresses, date, message ID, the plain text and
@@ -77,14 +86,17 @@ A message comes from a stranger, so the conversion treats it as hostile:
   forms, SVG and MathML are dropped with their content; event handlers and unknown attributes go; links keep only
   http, https, mailto and tel (also when the scheme is hidden behind character references or tabs).
 - **CSS stays inside the body.** Every selector of the message's style sheets is scoped to the body, so the message
-  cannot restyle or hide the header block. `@page`, `@import` and unknown at-rules are dropped, and fixed, absolute
-  and sticky positioning is removed, so nothing paints over the header.
+  cannot restyle or hide the header block. `@page`, `@import`, unknown at-rules and named pages (`page`, which
+  Outlook's HTML always has) are dropped, and fixed, absolute and sticky positioning is removed, so nothing paints over
+  the header.
 - **Nothing is fetched and no files are read.** Images load only from the message's own parts and `data:` URIs.
   Remote images (and tracking pixels) are left out unless you set `PdfOptions.ResourceResolver`, which is then asked
   for http and https URLs only; `PdfOptions.BaseDirectory` and `AllowFileAccess` are ignored.
 - **Bounded time and memory.** Parsing is linear in the size of the message, with `EmailLimits` on the message size
   (100 MB), the number of parts (10,000) and the nesting depth (64); over a limit the conversion throws
-  `PdfLimitException`. HTML nesting deeper than 200 elements is flattened. PdfPecker's own limits
+  `PdfLimitException`. An `.msg` file's size limit applies to the file, its attachments count as parts and its attached
+  messages as nesting; a damaged compound file (broken or cyclic sector chains, entries that share a stream) is read as
+  far as it goes, within a read budget of a few times the file's size. HTML nesting deeper than 200 elements is flattened. PdfPecker's own limits
   (`PdfOptions.MaxPages`) apply to the PDF.
 - **Documented exceptions only.** Damaged mail never fails the conversion; it fails only with `PdfLimitException`,
   `ArgumentException` for invalid options (such as attachments with PDF/A-2), `OperationCanceledException`, or
@@ -92,8 +104,10 @@ A message comes from a stranger, so the conversion treats it as hostile:
 
 ## Limitations
 
-- Outlook `.msg` files and `winmail.dat` (TNEF) are not read yet; they are planned. A `winmail.dat` is embedded as an
-  attachment.
+- `winmail.dat` (TNEF) is not read yet; it is planned. A `winmail.dat` is embedded as an attachment.
+- Outlook items that are not mail (appointments, contacts, tasks) are shown as the message part they carry, usually
+  the subject and body only. Attachments that are embedded OLE objects or links to files have no content to keep and
+  are listed empty. Rich text bodies (not HTML) become plain text without their formatting.
 - Attached messages are embedded as `.eml` files, not drawn in the PDF.
 - S/MIME and PGP: signed messages show their content and keep the signature as an attachment; encrypted ones show
   only the encrypted part as an attachment. Signatures are not verified.

@@ -9,8 +9,8 @@
 
     <PackageId>PdfPecker.Email</PackageId>
     <Authors>Moonwalker1307</Authors>
-    <Description>Convert e-mail (.eml, MIME) to PDF and PDF/A-3 with PdfPecker: headers, HTML or plain text bodies, inline images and the attachments embedded in the PDF. Dependency-free apart from PdfPecker; HTML bodies are sanitised and nothing is fetched from the network.</Description>
-    <PackageTags>email;eml;mime;rfc822;pdf;pdfa;pdf-a-3;email-to-pdf;eml-to-pdf;archive;attachments;pdfpecker</PackageTags>
+    <Description>Convert e-mail (.eml, MIME, and Outlook .msg) to PDF and PDF/A-3 with PdfPecker: headers, HTML or plain text bodies, inline images and the attachments embedded in the PDF. Dependency-free apart from PdfPecker; HTML bodies are sanitised and nothing is fetched from the network.</Description>
+    <PackageTags>email;eml;msg;outlook;mime;rfc822;pdf;pdfa;pdf-a-3;email-to-pdf;eml-to-pdf;msg-to-pdf;archive;attachments;pdfpecker</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>logo.png</PackageIcon>
     <PackageProjectUrl>https://github.com/Moonwalker1307/PdfPecker.Email</PackageProjectUrl>

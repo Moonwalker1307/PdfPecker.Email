@@ -1,7 +1,8 @@
 # PdfPecker.Email fuzzer
 
 A dependency-free mutation fuzzer, built like PdfPecker's own. There is no coverage feedback, so it relies on the seed
-messages (the test fixtures and two built-in ones) and broad mutations: bit flips, inserted MIME and HTML tokens,
+messages (the test fixtures, two built-in ones, and for the Outlook targets the .msg files the tests write) and broad
+mutations: bit flips, inserted MIME and HTML tokens,
 spliced seeds, cut-off input, and tokens repeated thousands of times to find work that grows faster than the input.
 It finds hangs, huge allocations, crashes and exception types the package does not document; it will not find logic
 bugs.
@@ -13,7 +14,7 @@ dotnet fuzz/PdfPecker.Email.Fuzz/bin/Release/net10.0/PdfPecker.Email.Fuzz.dll --
 
 | Option | Meaning |
 | --- | --- |
-| `--target <name\|all>` | `eml` (parse and convert, with the original embedded), `parse` (read the message and write the HTML, no PDF), `html` (the input as an HTML body, converted), `sanitize` (the sanitiser alone; its output sanitised again must not change). `--list` prints them. |
+| `--target <name\|all>` | `eml` (parse and convert, with the original embedded), `parse` (read the message and write the HTML, no PDF), `html` (the input as an HTML body, converted), `sanitize` (the sanitiser alone; its output sanitised again must not change), `msg` (an Outlook .msg file read and converted; most mutations change bytes in place so the compound file keeps its offsets), `rtf` (compressed RTF decompressed and read, and the input read as RTF). `--list` prints them. |
 | `--duration 90s\|10m\|1h` | How long to run each target (default 1m). |
 | `--jobs <n>` | Worker processes per target (default 1); use the number of cores. |
 | `--seed <n>` | Seed of the random generator; each worker derives its own from it. |
