@@ -19,7 +19,7 @@ namespace PdfPecker.Email;
 /// </remarks>
 public static class EmailToPdf
 {
-    /// <summary>Converts a message's MIME bytes, such as an .eml file's content, to a PDF.</summary>
+    /// <summary>Converts a message's MIME bytes, such as an .eml file's content, or an Outlook .msg file to a PDF.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="message"/> is null.</exception>
     /// <exception cref="ArgumentException">The PDF options are invalid, for example attachments with PDF/A-2.</exception>
     /// <exception cref="PdfLimitException">The message goes over an <see cref="EmailLimits"/> value or a PdfPecker limit.</exception>
@@ -78,7 +78,7 @@ public static class EmailToPdf
         HtmlToPdf.Convert(html, pdf, pdfOptions, cancellationToken);
     }
 
-    /// <summary>Converts an .eml file to a PDF file.</summary>
+    /// <summary>Converts an .eml or Outlook .msg file to a PDF file.</summary>
     /// <exception cref="ArgumentNullException">A path is null.</exception>
     /// <exception cref="ArgumentException">The PDF options are invalid, for example attachments with PDF/A-2.</exception>
     /// <exception cref="PdfLimitException">The message goes over an <see cref="EmailLimits"/> value or a PdfPecker limit.</exception>
@@ -181,9 +181,12 @@ public static class EmailToPdf
         if (options.EmbedOriginalMessage)
         {
             var name = FileNames.Clean(options.OriginalMessageFileName);
-            attachments.Add(new PdfAttachment(Unique(name.Length > 0 ? name : "message.eml", names), message.Source)
+            if (name.Length == 0) name = "message.eml";
+            // An Outlook message is kept as the .msg file it was read from, not the MIME written for it.
+            if (message.IsOutlookMessage && name.EndsWith(".eml", StringComparison.OrdinalIgnoreCase)) name = name[..^4] + ".msg";
+            attachments.Add(new PdfAttachment(Unique(name, names), message.Original)
             {
-                MimeType = "message/rfc822",
+                MimeType = message.IsOutlookMessage ? "application/vnd.ms-outlook" : "message/rfc822",
                 Relationship = PdfAttachmentRelationship.Source,
             });
         }

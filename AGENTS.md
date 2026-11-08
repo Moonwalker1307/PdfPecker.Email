@@ -3,11 +3,12 @@
 Guidance for coding agents (and people) working in this repository. `CLAUDE.md` imports this file, so Claude Code and
 other agents read the same rules.
 
-PdfPecker.Email is the `PdfPecker.Email` NuGet package: e-mail (.eml, MIME) to PDF and PDF/A-3 with the attachments
-embedded. It has its own MIME parser, header decoders, HTML sanitiser and CSS filter, and hands the HTML it writes to
+PdfPecker.Email is the `PdfPecker.Email` NuGet package: e-mail (.eml, MIME, and Outlook .msg) to PDF and PDF/A-3 with
+the attachments embedded. It has its own MIME parser, Outlook reader, header decoders, HTML sanitiser and CSS filter,
+and hands the HTML it writes to
 the [PdfPecker](https://www.nuget.org/packages/PdfPecker) package, which lives in
-[Moonwalker1307/PdfPecker](https://github.com/Moonwalker1307/PdfPecker). Outlook .msg (a CFB container) is planned
-next, in this package.
+[Moonwalker1307/PdfPecker](https://github.com/Moonwalker1307/PdfPecker). `winmail.dat` (TNEF) is planned next, in
+this package.
 
 ## Core rules
 
@@ -45,8 +46,12 @@ next, in this package.
   quoted-printable), `Charsets` (charset names and the UTF-8 or Windows-1252 guess).
 - `src/PdfPecker.Email/Html/` – `EmailHtmlWriter` (the document PdfPecker converts: header block and body),
   `HtmlSanitizer`, `CssFilter`, `PlainText` (format=flowed and links), `Markup` (escaping).
+- `src/PdfPecker.Email/Msg/` – Outlook .msg: `CompoundFile` (the MS-CFB container), `OutlookMessage` (MAPI
+  properties to the MIME message they stand for, which `EmailMessage.Parse` then reads like any .eml),
+  `CompressedRtf` (MS-OXRTFCP) and `RtfText` (HTML encapsulated in RTF, or the plain text of other RTF).
 - `tests/PdfPecker.Email.Tests/` – xUnit. `Fixtures/*.eml` are the sample messages (kept with CRLF line ends by
-  `.gitattributes`), `Golden/*.html` the HTML each becomes.
+  `.gitattributes`), `Golden/*.html` the HTML each becomes. `Msg/MsgBuilder.cs` writes .msg files, and `Msg/MsgFixtures.cs` the Outlook
+  fixtures with it (real .msg files carry real people's addresses, so none are checked in); the fuzzer links both.
 - `fuzz/PdfPecker.Email.Fuzz/` – the mutation fuzzer; `fuzz/README.md` describes it.
 - `bench/PdfPecker.Email.Benchmarks/` – times parsing and conversion of the fixtures and generated messages.
 - `.github/workflows/` – `build.yml` (build, tests on .NET 8, 9 and 10 and on Windows, pack, publish on a release),
@@ -70,6 +75,9 @@ baselines changed and why. A refactor leaves every baseline unchanged.
 
 - **A new header, MIME structure or encoding**: a fixture or an inline message in `MimeTests` or `MessageTests`, and a
   line in the README when users see it.
+- **Outlook .msg**: the MIME written for a .msg file is base64 throughout and its header values have no control
+  characters, so no property can add a header or a part; keep it so. A new property needs a `MsgTests` case built
+  with `MsgObject`, and a check against a real Outlook file where one is at hand (not checked in).
 - **Sanitiser and CSS filter changes**: a `SanitizerTests` case for what is kept and for what is dropped; anything
   that loosens the allow-list needs a reason in the PR.
 - **A fuzz finding**: fix the cause, add the input (minimised) as a test in `HostileInputTests` or `SanitizerTests`,
@@ -96,5 +104,9 @@ baselines changed and why. A refactor leaves every baseline unchanged.
 - PdfPecker repeats a link's URL in the annotation of every line the link covers, so a huge URL across many lines
   makes the PDF grow with the square of its length; links over 4,096 characters are written as text.
 - `PdfAttachments.List` returns embedded files sorted by name (the PDF's name tree), not in the order they were added.
+- Outlook keeps most HTML mail only as compressed RTF with the HTML encapsulated (`\fromhtml1`); the HTML property
+  (0x1013) is often missing, so `RtfText` is the usual path for HTML from Outlook, not a fallback.
+- Word's HTML, which Outlook sends, puts the body in `div.WordSection1 { page: WordSection1 }`; PdfPecker starts a new
+  page for a named page, which is why `CssFilter` drops `page`.
 - PdfPecker deflates every embedded file, so a large incompressible attachment (a zip, a JPEG) costs most of the
   conversion time.

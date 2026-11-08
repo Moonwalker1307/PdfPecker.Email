@@ -55,6 +55,37 @@ internal static class FileNames
         return clean;
     }
 
+    /// <summary>
+    /// The media type that a file name's extension stands for, or null. Outlook often stores attachments without a
+    /// type, and an image's type decides whether it can be shown.
+    /// </summary>
+    internal static string? MediaTypeOf(string? name) => Path.GetExtension(name ?? "").ToLowerInvariant() switch
+    {
+        ".pdf" => "application/pdf",
+        ".png" => "image/png",
+        ".jpg" or ".jpeg" or ".jfif" => "image/jpeg",
+        ".gif" => "image/gif",
+        ".webp" => "image/webp",
+        ".bmp" => "image/bmp",
+        ".tif" or ".tiff" => "image/tiff",
+        ".txt" => "text/plain",
+        ".htm" or ".html" => "text/html",
+        ".ics" => "text/calendar",
+        ".csv" => "text/csv",
+        ".xml" => "application/xml",
+        ".json" => "application/json",
+        ".zip" => "application/zip",
+        ".eml" => "message/rfc822",
+        ".msg" => "application/vnd.ms-outlook",
+        ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".doc" => "application/msword",
+        ".xls" => "application/vnd.ms-excel",
+        ".ppt" => "application/vnd.ms-powerpoint",
+        _ => null,
+    };
+
     private static string Extension(MimeEntity part) => part.ContentType switch
     {
         "application/pdf" => ".pdf",

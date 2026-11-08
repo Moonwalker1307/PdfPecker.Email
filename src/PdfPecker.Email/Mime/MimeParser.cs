@@ -19,17 +19,22 @@ internal sealed class MimeParser
     }
 
     internal static MimeEntity Parse(byte[] message, EmailLimits limits, CancellationToken cancellationToken)
+        => Parse(message, message.Length, limits, cancellationToken);
+
+    /// <summary>Parses the first <paramref name="length"/> bytes of a buffer, which may be longer than the message.</summary>
+    internal static MimeEntity Parse(byte[] message, int length, EmailLimits limits, CancellationToken cancellationToken)
     {
-        if (message.Length > limits.MaxMessageBytes)
-            throw new PdfLimitException($"The message is {message.Length} bytes, over the limit of {limits.MaxMessageBytes} (EmailLimits.MaxMessageBytes).");
+        if (length > limits.MaxMessageBytes)
+            throw new PdfLimitException($"The message is {length} bytes, over the limit of {limits.MaxMessageBytes} (EmailLimits.MaxMessageBytes).");
         var start = 0;
+        var span = message.AsSpan(0, length);
         // An mbox "From " separator line before the headers is not a header.
-        if (message.AsSpan().StartsWith("From "u8))
+        if (span.StartsWith("From "u8))
         {
-            var lf = message.AsSpan().IndexOf((byte)'\n');
-            start = lf < 0 ? message.Length : lf + 1;
+            var lf = span.IndexOf((byte)'\n');
+            start = lf < 0 ? length : lf + 1;
         }
-        return new MimeParser(limits, cancellationToken).ParseEntity(message, start, message.Length, 0, digest: false);
+        return new MimeParser(limits, cancellationToken).ParseEntity(message, start, length, 0, digest: false);
     }
 
     private MimeEntity ParseEntity(byte[] source, int start, int end, int depth, bool digest)
