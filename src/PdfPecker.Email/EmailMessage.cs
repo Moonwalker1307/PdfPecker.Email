@@ -238,7 +238,7 @@ public sealed partial class EmailMessage
     private static string? DecodedHeader(MimeEntity entity, string name)
     {
         var raw = entity.Header(name);
-        return raw is null ? null : HeaderValues.DecodeWords(raw);
+        return raw is null ? null : BidiControls.Remove(HeaderValues.DecodeWords(raw));
     }
 
     private void IndexResources(MimeEntity entity)

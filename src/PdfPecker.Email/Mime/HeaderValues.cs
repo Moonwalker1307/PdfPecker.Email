@@ -350,8 +350,9 @@ internal static class HeaderValues
                 address = text;
                 name = comment;
             }
-            address = address.Replace(" ", "", StringComparison.Ordinal);
+            address = BidiControls.Remove(address.Replace(" ", "", StringComparison.Ordinal));
             name = CleanName(name);
+            if (name is not null && BidiControls.Remove(name) is var visible) name = visible.Length > 0 ? visible : null;
             if (address.Length > 0 || name is not null)
             {
                 result.Add(new EmailAddress(name, address));

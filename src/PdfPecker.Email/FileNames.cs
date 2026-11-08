@@ -35,6 +35,7 @@ internal static class FileNames
     {
         if (string.IsNullOrWhiteSpace(name)) return string.Empty;
         // Only the last path segment is a file name; senders on Windows include the folder.
+        name = Mime.BidiControls.RemoveFromFileName(name);
         var slash = name.LastIndexOfAny(['/', '\\']);
         if (slash >= 0) name = name[(slash + 1)..];
         var sb = new StringBuilder(name.Length);

@@ -133,4 +133,29 @@ public sealed class MessageTests
             """);
         Assert.Equal("attachment-1.ics", Assert.Single(m.Attachments).FileName);
     }
+
+    [Fact]
+    public void Bidi_overrides_cannot_disguise_file_names_or_headers()
+    {
+        // U+202E turns the rest of a line around: "invoice\u202Efdp.exe" shows as "invoiceexe.pdf".
+        var message = Fixture.FromText(
+            "From: =?utf-8?B?" + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Bank \u202Eknab")) + "?= <a@example.com\u202E>\r\n" +
+            "Subject: =?utf-8?B?" + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Pay \u2066now\u2069 \u05E9\u05DC\u05D5\u05DD")) + "?=\r\n" +
+            "Content-Type: multipart/mixed; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nx\r\n" +
+            "--b\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename*=utf-8''invoice%E2%80%AEfdp.exe\r\n\r\nMZ\r\n--b--\r\n");
+        Assert.Equal("invoicefdp.exe", Assert.Single(message.Attachments).FileName);
+        Assert.Equal("Bank knab", message.From[0].Name);
+        Assert.Equal("a@example.com", message.From[0].Address);
+        // Hebrew keeps its letters; only the isolate controls go.
+        Assert.Equal("Pay now \u05E9\u05DC\u05D5\u05DD", message.Subject);
+        Assert.DoesNotContain('\u202E', Fixture.Html(message));
+    }
+
+    [Fact]
+    public void Direction_marks_stay_in_headers_but_not_in_file_names()
+    {
+        Assert.Equal("a\u200Fb", PdfPecker.Email.Mime.BidiControls.Remove("a\u200Fb"));
+        Assert.Equal("ab.pdf", FileNames.Clean("a\u200Fb.pdf"));
+        Assert.Equal("plain", PdfPecker.Email.Mime.BidiControls.Remove("plain"));
+    }
 }
