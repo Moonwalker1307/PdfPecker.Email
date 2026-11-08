@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PdfPecker.Email/PdfPecker.Email.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PdfPecker.Email.Tests/PdfPecker.Email.Tests.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/PdfPecker.Email.Sample/PdfPecker.Email.Sample.csproj" />
+  </Folder>
+  <Folder Name="/fuzz/">
+    <Project Path="fuzz/PdfPecker.Email.Fuzz/PdfPecker.Email.Fuzz.csproj" />
+  </Folder>
+  <Folder Name="/bench/">
+    <Project Path="bench/PdfPecker.Email.Benchmarks/PdfPecker.Email.Benchmarks.csproj" />
+  </Folder>
+</Solution>

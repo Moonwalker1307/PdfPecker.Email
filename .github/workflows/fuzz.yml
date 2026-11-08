@@ -1,0 +1,106 @@
+name: Fuzz
+
+# Nightly, and on demand. Deliberately not on pull requests: a fuzz run is random, so it must not decide whether a
+# change can merge. A finding fails the job and uploads the inputs; see fuzz/README.md.
+on:
+  schedule:
+    - cron: "41 2 * * *"
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: Minutes to fuzz each target
+        default: "10"
+      target:
+        description: One target name (eml, parse, html, sanitize), or "all"
+        default: all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - id: pick
+        env:
+          ALL: eml parse html sanitize
+          TARGET: ${{ github.event_name == 'schedule' && 'all' || inputs.target }}
+        run: |
+          if [ "$TARGET" = "all" ]; then
+            picked="$ALL"
+          elif [[ " $ALL " == *" $TARGET "* ]]; then
+            picked="$TARGET"
+          else
+            echo "::error::Unknown fuzz target '$TARGET'; use one of: $ALL, or all"
+            exit 1
+          fi
+          json=$(printf '%s\n' $picked | jq -R . | jq -cs .)
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+
+  fuzz:
+    name: fuzz ${{ matrix.target }}
+    needs: targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - run: dotnet build -c Release fuzz/PdfPecker.Email.Fuzz
+
+      # The seed is the run id, so every night explores different inputs.
+      - name: Fuzz ${{ matrix.target }}
+        env:
+          MINUTES: ${{ inputs.minutes || '10' }}
+          TARGET: ${{ matrix.target }}
+          SEED: ${{ github.run_id }}
+        run: >
+          dotnet fuzz/PdfPecker.Email.Fuzz/bin/Release/net10.0/PdfPecker.Email.Fuzz.dll
+          --target "$TARGET" --duration "${MINUTES}m" --seed "$((SEED % 1000000))" --jobs "$(nproc)" --out fuzz-findings
+
+      # The inputs are small, so each finding's report and its input (base64) also go into the job summary.
+      - name: Print findings
+        if: ${{ failure() }}
+        run: |
+          shopt -s nullglob
+          for txt in fuzz-findings/*/*.txt; do
+            input="${txt%.txt}.eml"
+            {
+              echo "### $txt"
+              echo '```'
+              head -c 4000 "$txt"
+              echo
+              echo "base64 of $input:"
+              base64 -w0 "$input" | head -c 200000
+              echo
+              echo '```'
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload findings
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-findings-${{ matrix.target }}
+          path: fuzz-findings/
+          if-no-files-found: ignore
+          retention-days: 30

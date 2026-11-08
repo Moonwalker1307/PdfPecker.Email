@@ -1,0 +1,18 @@
+# Weekly pull requests for the pinned GitHub Actions and the test packages. PdfPecker itself is bumped by hand after
+# each release, together with any new option worth passing through, so Dependabot leaves it alone.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: PdfPecker
+    groups:
+      nuget-minor-and-patch:
+        update-types: [minor, patch]

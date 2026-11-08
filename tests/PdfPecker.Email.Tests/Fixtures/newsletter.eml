@@ -1,0 +1,83 @@
+Return-Path: <news@example.org>
+From: Example News <news@example.org>
+To: reader@example.com
+Subject: Weekly update: =?iso-8859-1?q?caf=E9?= opening
+Date: Tue, 3 Nov 2026 07:30:00 -0500
+Message-ID: <news-42@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="outer"
+
+This is a multi-part message in MIME format.
+
+--outer
+Content-Type: multipart/alternative; boundary="alt"
+
+--alt
+Content-Type: text/plain; charset=us-ascii
+
+Plain version of the newsletter.
+
+--alt
+Content-Type: multipart/related; boundary="rel"; type="text/html"
+
+--rel
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><title>Ignored title</title>
+<style type=3D"text/css">
+@import url("https://tracker.example.net/a.css");
+@page { size: A3; margin: 0 }
+body { background: #f4f4f4; }
+h1, .headline { color: #c81e1e; position: fixed; font-size: 20pt }
+@media screen and (max-width: 600px) { td { padding: 2px } }
+</style></head>
+<body bgcolor=3D"#ffffff" style=3D"margin:0">
+<table width=3D"100%" cellpadding=3D"8"><tr><td>
+<img src=3D"cid:logo@example.org" alt=3D"Example logo" width=3D"40" height=3D"20">
+<h1 class=3D"headline">Caf=C3=A9 opening</h1>
+<p>Our new caf=C3=A9 opens on <b>Friday</b>. <a href=3D"https://example.org/=
+cafe">Read more</a>.</p>
+<img src=3D"https://tracker.example.net/pixel.gif?id=3D42" width=3D"1" heigh=
+t=3D"1">
+<img src=3D"dot.png">
+</td></tr></table>
+</body></html>
+
+--rel
+Content-Type: image/png
+Content-ID: <logo@example.org>
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAIAAABwJOjsAAAAJElEQVR4nGM4ISc3IIhh1OJRi0ct
+HrV41OJRi0ctHrV45FgMAFLhLK5mrmiuAAAAAElFTkSuQmCC
+
+--rel
+Content-Type: image/png
+Content-Location: dot.png
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEUlEQVR4nGMQqbiDFTEMLQkA+MZa
+ARTdh/AAAAAASUVORK5CYII=
+
+--rel
+Content-Type: image/png; name="unused.png"
+Content-ID: <unused@example.org>
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEUlEQVR4nGMQqbiDFTEMLQkA+MZa
+ARTdh/AAAAAASUVORK5CYII=
+--rel--
+
+--alt--
+
+--outer
+Content-Type: application/pdf; name="Programme.pdf"
+Content-Disposition: attachment; filename="Programme.pdf";
+ creation-date="Mon, 2 Nov 2026 10:00:00 +0100"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBv
+Ymo8PC9UeXBlL1BhZ2VzL0tpZHNbXS9Db3VudCAwPj5lbmRvYmoKdHJhaWxlcjw8L1Jvb3QgMSAw
+IFI+PgolJUVPRgo=
+--outer--

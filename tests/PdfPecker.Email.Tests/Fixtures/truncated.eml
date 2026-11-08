@@ -1,0 +1,16 @@
+From: broken@example.com
+Subject: Truncated
+Content-Type: multipart/mixed; boundary=xyz
+
+--xyz
+Content-Type: text/html; charset=bogus-charset
+Content-Transfer-Encoding: base64
+
+PGh0bWw+PGJvZHk+PHA+QnJva2VuIGJ1dCByZWFkYWJsZTwvcD48L2JvZHk+PC9odG1sPg=
+=%%garbage%%
+--xyz
+Content-Type: image/png
+Content-Disposition: attachment; filename="cut.png"
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAA
