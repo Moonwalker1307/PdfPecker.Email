@@ -8,8 +8,9 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
-  <!-- Local builds pack as a pre-release; CI passes the real version. -->
+  <!-- Local builds pack as a pre-release; CI passes the real version, which for a release is the PdfPecker version in
+       Directory.Packages.props. -->
   <PropertyGroup>
-    <Version>0.1.0-dev</Version>
+    <Version>1.24.0-dev</Version>
   </PropertyGroup>
 </Project>
