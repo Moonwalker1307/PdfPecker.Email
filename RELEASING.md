@@ -1,10 +1,13 @@
 # Releasing
 
-PdfPecker.Email has its own version, starting at 0.1.0; it is not tied to PdfPecker's version. Each release names the
-PdfPecker version it was built and tested with in `Directory.Packages.props`.
+PdfPecker.Email has PdfPecker's version, as the other add-on packages do, starting at 1.24.0: each release follows a
+PdfPecker release, carries its number and depends on it as a minimum (`PdfPecker` in `Directory.Packages.props`).
+`build.yml` refuses a release tag that differs from that version. A fix that cannot wait for the next PdfPecker
+release goes out with the next PdfPecker patch release.
 
-1. Merge a pull request that sets `<Version>` in `Directory.Build.props` to the new version (CI packs with the
-   release tag's version, so this is only the local default) and updates the README for what changed.
+1. Merge a pull request that sets `PdfPecker` in `Directory.Packages.props` and `<Version>` in `Directory.Build.props`
+   (as `<version>-dev`; CI packs with the release tag's version, so this is only the local default) to the new
+   version, and updates the README for what changed.
 2. The owner creates the GitHub release `v<version>`. The `publish` job of `build.yml` builds, tests, packs and pushes
    the package to nuget.org with Trusted Publishing (environment `nuget`, repository variable `NUGET_USER`; nuget.org
    policy: owner Moonwalker1307, repository PdfPecker.Email, workflow `build.yml`, environment `nuget`).
