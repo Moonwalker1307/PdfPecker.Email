@@ -34,6 +34,8 @@ dotnet add package PdfPecker.Email
 The package targets `net8.0`, `net9.0` and `net10.0`, is trimmable and Native AOT compatible, and depends only on
 PdfPecker.
 
+**1.25.0 is the last release for .NET 8 and 9.** Microsoft ended support for both on 10 November 2026, and PdfPecker 1.25.0 is the last PdfPecker release for them. The next release of PdfPecker.Email follows it and targets .NET 10 and later only; 1.25.0 and earlier releases keep working on .NET 8 and 9.
+
 ## What it does
 
 - **MIME, as mail clients read it.** Multipart mixed, alternative, related, signed, digest and report; base64 and

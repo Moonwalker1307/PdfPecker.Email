@@ -30,6 +30,8 @@ the [PdfPecker](https://www.nuget.org/packages/PdfPecker) package, which lives i
 - **No breaking API changes before 2.0.** Add overloads and options; package validation checks the API against the
   last release once there is one (see `RELEASING.md`).
 - **Trimmable and AOT-compatible.** No reflection, `dynamic` or runtime code generation.
+- **.NET 8 and 9 end with 1.25.0.** It is the last release for them (`README.md`), as in PdfPecker; the release after it
+  targets net10.0 and later only.
 - **Sealed, static and span-based.** Classes are `sealed` (or `static`), and `src/PdfPecker.Email/.globalconfig` turns
   the .NET performance analyzers into build errors, as in PdfPecker.
 - **Culture-independent output.** Format and parse with `CultureInfo.InvariantCulture` and compare strings ordinally;
