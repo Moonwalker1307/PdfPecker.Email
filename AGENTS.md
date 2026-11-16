@@ -30,8 +30,8 @@ the [PdfPecker](https://www.nuget.org/packages/PdfPecker) package, which lives i
 - **No breaking API changes before 2.0.** Add overloads and options; package validation checks the API against the
   last release once there is one (see `RELEASING.md`).
 - **Trimmable and AOT-compatible.** No reflection, `dynamic` or runtime code generation.
-- **.NET 8 and 9 end with 1.25.0.** It is the last release for them (`README.md`), as in PdfPecker; the release after it
-  targets net10.0 and later only.
+- **.NET 10 only.** 1.25.0 was the last release for .NET 8 and 9 (`README.md`), as in PdfPecker; the package targets
+  net10.0.
 - **Sealed, static and span-based.** Classes are `sealed` (or `static`), and `src/PdfPecker.Email/.globalconfig` turns
   the .NET performance analyzers into build errors, as in PdfPecker.
 - **Culture-independent output.** Format and parse with `CultureInfo.InvariantCulture` and compare strings ordinally;
@@ -57,7 +57,7 @@ the [PdfPecker](https://www.nuget.org/packages/PdfPecker) package, which lives i
   fixtures with it (real .msg files carry real people's addresses, so none are checked in); the fuzzer links both.
 - `fuzz/PdfPecker.Email.Fuzz/` – the mutation fuzzer; `fuzz/README.md` describes it.
 - `bench/PdfPecker.Email.Benchmarks/` – times parsing and conversion of the fixtures and generated messages.
-- `.github/workflows/` – `build.yml` (build, tests on .NET 8, 9 and 10 and on Windows, pack, publish on a release),
+- `.github/workflows/` – `build.yml` (build, tests on .NET 10 on Linux and Windows, pack, publish on a release),
   `fuzz.yml` (nightly), `vulnerability-scan.yml` (daily OSV-Scanner run on the NuGet packages, results in Security →
   Code scanning).
 
